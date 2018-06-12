@@ -137,7 +137,8 @@ ENV TCZ_DEPS        iptables \
                     procps glib2 libtirpc libffi fuse pcre \
                     udev-lib udev-extra \
                     liblvm2 \
-                    parted
+                    parted \
+                    libxml2
 
 # Download the rootfs, don't unpack it though:
 RUN set -ex; \
@@ -270,6 +271,25 @@ RUN ln -sT libtirpc.so "$ROOTFS/usr/local/lib/libtirpc.so.1" \
 # verify that all the above actually worked (at least producing a valid binary, so we don't repeat issue #1157)
 RUN LD_LIBRARY_PATH='/lib:/usr/local/lib' \
 		chroot "$ROOTFS" vmhgfs-fuse --version
+
+RUN set -eux; \
+	apt-get update; \
+	apt-get -y install \
+		libcurl4-openssl-dev \
+		libxml2-dev \
+		libsysfs-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
+
+RUN set -ex \
+	&& mkdir -p /rng-tools \
+	&& curl -rSL "https://codeload.github.com/nhorman/rng-tools/tar.gz/v6.2" \
+		| tar -xzC /rng-tools --strip-components 1 \
+	&& cd /rng-tools \
+	&& ./autogen.sh && ./configure && make && make check \
+	&& cp -v "./rngd" "$ROOTFS/usr/local/bin" \
+	&& ln -s "libcrypto.so.1.0.0" "$ROOTFS/usr/local/lib/libcrypto.so.1.1" \
+	&& ln -s "libssl.so.1.0.0" "$ROOTFS/usr/local/lib/libssl.so.1.1"
 
 # Download and build Parallels Tools
 ENV PRL_MAJOR 13
